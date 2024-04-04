@@ -1,0 +1,152 @@
+package com.allianz.onemarketing.platform.common.stepdefinitions;
+import com.allianz.onemarketing.platform.utils.BrowserStepHelper;
+
+import io.cucumber.java.en.Given;
+import io.cucumber.java.en.Then;
+import io.cucumber.java.en.When;
+
+import java.io.IOException;
+
+import static com.allianz.onemarketing.platform.utils.BrowserStepHelper.retryWhenTimeout;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+
+public class CommonSteps {
+
+
+  BrowserStepHelper stepHelper;
+
+  public CommonSteps(BrowserStepHelper stepHelper) {
+    this.stepHelper = stepHelper;
+
+  }
+
+  @When("I switch to tablet view")
+  public void i_switch_to_Tablet_view() {
+    stepHelper.switchToTabletMode();
+  }
+
+  @When("I switch to mobile view")
+  public void i_switch_to_Mobile_view() {
+    stepHelper.switchToMobileMode();
+  }
+
+  @Then("The {string} and {string} messages are displayed")
+  public void i_validate_the_status(String invalidMessage,String validMessage) {
+    stepHelper.switchToIframe("ContentFrame");
+    stepHelper.validateDisplay(invalidMessage);
+    stepHelper.validateDisplay(validMessage);
+    stepHelper.switchToDefaultContent();
+  }
+
+  @Then("{string} is displayed")
+  public void is_displayed(String elementName) {
+      stepHelper.validateDisplay(elementName);
+  }
+
+  @When("I click on {string}")
+  public void i_click_on(String element) {
+    stepHelper.handleStaticWait(2000);
+    stepHelper.clickOn(element);
+  }
+
+  @When("I click on {string} using query selector")
+  public void i_click_on_using_queryselector(String element) {
+    stepHelper.clickOnUsingQuerySelector(element);
+  }
+
+  @Then("{string} is present on the page")
+  public void element_is_present(String element) {
+    assertTrue("Element " + element + " is not present on the page", stepHelper.validateElementPresent(element)); }
+
+  @Then("{string} is active")
+  public void verify_active_class(String element) {
+    stepHelper.verifyClassStatus(element, "active");
+  }
+
+  @Then("{string} is present in the DOM")
+  public void element_is_present_in_DOM(String element) {
+    assertTrue("Element not present in the DOM", stepHelper.validateElementPresent(element)); }
+
+  @Then("I enter text {string} in {string}")
+  public void i_enter_text(String text, String element) {
+    stepHelper.enterText(text, element);
+  }
+
+  @When("I hover mouse on {string}")
+   public void scroll_to_element(String element) {
+    stepHelper.handleStaticWait(3000);
+    stepHelper.hoverOverElement(element);
+  }
+
+  @Then("The {string} attribute for {string} is present in the DOM with value {string}")
+  public void attribute_present_in_DOM_with_value(String attribute_name, String element, String attribute_value) {
+    assertEquals(attribute_value, stepHelper.validateAttributeForElementPresent(attribute_name, element)); }
+
+  @Then("I click on {string} if present on the page")
+  public void click_element_if_present(String element) {
+   stepHelper.clickifElementPresent(element);
+  }
+
+
+  @Then("{string} is a mandatory field")
+  public void verify_mandatory_class(String element) {
+    stepHelper.verifyMandatoryClass(element,"has-required");
+  }
+
+  @Then("I remove platform seo configuration")
+  public void remove_seo_configuration() {
+    stepHelper.removePlatformSeoConfiguration("platform seo configuration");
+  }
+
+  @Then("{string} is not visible on the page")
+  public void validate_not_visible(String element) {
+    assertTrue("Element is still visible on the page", stepHelper.validateElementNotPresent(element)); }
+
+  @Then("I navigate to {string} page in same tab")
+  public void navigate_page_in_same_tab(String urlText) {
+    assertTrue("Error while validating URL in same tab.", stepHelper.validateURLInSameTab(urlText)); }
+
+  @Then("{string} displays background color as {string}")
+  public void verify_background_colour(String element, String colourCode) {
+    assertEquals("#" + colourCode.toLowerCase(), stepHelper.returnColour(element, "background-color").toLowerCase());
+  }
+
+  @Then("I scroll to {string} of the page")
+  public void scroll(String direction){
+    stepHelper.scrollPage(direction);
+  }
+
+  @When("I select {string}")
+  public void i_click_using_wait_on(String element) {
+    stepHelper.handleStaticWait(2000);
+    stepHelper.clickOn(element); }
+
+  @When("I select {string} from {string} dropdown")
+    public void i_click_and_select_in_dropdown (String value, String element){
+    stepHelper.clickOn(element);
+    stepHelper.handleStaticWait(2000);
+    stepHelper.clickOn(value);
+  }
+
+  @Then("{string} is enabled")
+  public void verify_button_enabled(String element){
+    stepHelper.isButtonEnabled(element);
+  }
+
+  @Then("The {string} attribute for {string} is present in the DOM which contains value {string}")
+  public void attribute_present_in_DOM_which_contains_value(String attribute_name, String element, String attribute_value) {
+    assertTrue(attribute_value, stepHelper.validateAttributeForElementPresentContainsValue(attribute_name, element,attribute_value));
+  }
+
+  @Then("The {string} attribute for {string} is not present in the DOM")
+  public void the_attribute_for_is_not_present_in_the_DOM(String attribute_name, String element) {
+        assertTrue("Element " + element + " is not present in the DOM", stepHelper.validateAttributeNotPresentForElement(attribute_name, element));
+  }
+
+  @When("I move the focus out of {string}")
+  public void i_move_the_focus_out_of(String elementSelector) {
+      stepHelper.moveOutFocus(elementSelector);
+  }
+}
