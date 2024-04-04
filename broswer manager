@@ -1,0 +1,119 @@
+package com.allianz.onemarketing.platform.utils;
+
+import io.github.bonigarcia.wdm.WebDriverManager;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.firefox.FirefoxDriver;
+import org.openqa.selenium.firefox.FirefoxOptions;
+import org.openqa.selenium.remote.CapabilityType;
+import org.openqa.selenium.safari.SafariDriver;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+public class BrowserManager {
+  // Browser Properties
+  private static final Logger LOGGER = LogManager.getLogger(BrowserManager.class.getName());
+  // browser details
+  private static final List<String> localBrowsers = Arrays.asList("LOCAL", "JENKINS", "LOCALCONTAINER");
+  // WebDriver instance
+  private final WebDriver driver;
+
+  public BrowserManager(final BrowserManagerPropertyProvider propertyReader) {
+    final String browserName = propertyReader.get("browserName");
+    final String executionType = propertyReader.get("executionType").toUpperCase();
+    final boolean isHeadlessBrowser = Boolean.parseBoolean(propertyReader.get("headless"));
+    final String chromeDriverVersion = propertyReader.get("chromeDriverVersion");
+    final boolean isOverrideAgent = Boolean.parseBoolean(propertyReader.get("overrideAgent"));
+    if (localBrowsers.contains(executionType)) {
+      driver = launchLocalBrowser(browserName, isHeadlessBrowser, isOverrideAgent);
+    }
+    else {
+      LOGGER.error("Wrong execution type mentioned in global.properties file");
+      throw new IllegalStateException(String.format("unknown browser type: %s", executionType));
+    }
+    deleteCookies();
+  }
+
+  private static WebDriver launchLocalBrowser(String browserName, boolean isHeadlessBrowser, boolean isOverrideAgent) {
+    switch (browserName.toLowerCase()) {
+      case "chrome":
+        return launchChrome(isHeadlessBrowser, isOverrideAgent);
+      case "firefox":
+        return launchFirefox(isHeadlessBrowser);
+      case "safari":
+        return launchSafari();
+      default:
+        throw new IllegalArgumentException("Unknown browser name");
+    }
+  }
+
+  private static WebDriver launchChrome(final boolean isHeadlessBrowser, boolean isOverrideAgent) {
+    ChromeOptions chromeOptions = null;
+    chromeOptions = chromeDriverOptions(isHeadlessBrowser,isOverrideAgent);
+    System.setProperty("webdriver.chrome.whitelistedIps", "");
+    System.setProperty("webdriver.chrome.silentOutput", "true");
+    return new ChromeDriver(chromeOptions);
+
+  }
+
+  private static WebDriver launchFirefox(final boolean isHeadlessBrowser) {
+    geckoDriverSetup();
+    return new FirefoxDriver(firefoxDriverOptions(isHeadlessBrowser));
+  }
+
+  private static ChromeOptions chromeDriverOptions(final boolean isHeadlessBrowser, final boolean isOverrideAgent) {
+    ChromeOptions chromeOptions = new ChromeOptions();
+    if (isHeadlessBrowser) {
+      chromeOptions.addArguments("--headless");
+    }
+    if(isOverrideAgent){
+      chromeOptions.addArguments("--user-agent=oneMarketing_monitoring_agent");
+    }
+    chromeOptions.setAcceptInsecureCerts(true);
+    chromeOptions.addArguments("start-maximized", "--window-size=1600,900", "--disable-dev-shm-usage", "--verbose",
+        "--disable-web-security", "--ignore-certificate-errors", "--allow-running-insecure-content", "--allow-insecure-localhost",
+        "--no-sandbox", "--disable-gpu", "--incognito", "--remote-allow-origins=*");
+    chromeOptions.setExperimentalOption("excludeSwitches", Collections.singletonList("disable-popup-blocking"));
+    return chromeOptions;
+  }
+
+  private static FirefoxOptions firefoxDriverOptions(final boolean isHeadlessBrowser) {
+    FirefoxOptions firefoxOptions = new FirefoxOptions();
+    if (isHeadlessBrowser) {
+      LOGGER.info("Preparing to launch headless firefox browser");
+      firefoxOptions.setHeadless(true);
+    }
+    return firefoxOptions;
+  }
+
+  private static void geckoDriverSetup() {
+    WebDriverManager.firefoxdriver().setup();
+  }
+
+  public static WebDriver launchSafari() {
+    return new SafariDriver();
+  }
+
+  public WebDriver getDriver() {
+    return this.driver;
+  }
+
+  public void closeDriver() {
+    if (getDriver() != null) {
+      getDriver().quit();
+    }
+  }
+
+  public void quitBrowser() {
+    closeDriver();
+  }
+
+  private void deleteCookies() {
+    driver.manage().deleteAllCookies();
+  }
+}
