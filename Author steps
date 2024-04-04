@@ -1,0 +1,173 @@
+package com.allianz.onemarketing.platform.author.stepdefinitions;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import com.allianz.onemarketing.platform.common.picocntainer.TestingGlobalPropertyProvider;
+import com.allianz.onemarketing.platform.common.picocntainer.TestingLocatorPropertyProvider;
+import com.allianz.onemarketing.platform.utils.BrowserManager;
+import com.allianz.onemarketing.platform.utils.BrowserStepHelper;
+import com.allianz.onemarketing.platform.utils.LocationPropertyProvider;
+import com.allianz.onemarketing.platform.utils.StepHelper;
+import io.cucumber.java.en.Given;
+import io.cucumber.java.en.Then;
+import io.cucumber.java.en.When;
+
+public class AuthorSteps {
+
+  private final BrowserStepHelper stepHelper;
+  private final LocationPropertyProvider locatorPropertyReader;
+
+  public AuthorSteps(BrowserManager browserManager, TestingGlobalPropertyProvider globalPropertyProvider,
+      TestingLocatorPropertyProvider testingLocatorPropertyProvider) {
+    this.stepHelper = new BrowserStepHelper(browserManager, globalPropertyProvider, testingLocatorPropertyProvider);
+    this.locatorPropertyReader = testingLocatorPropertyProvider; }
+
+  @Then("I open {string} page under {string} in edit mode")
+  public void open_page_in_edit_mode(String pageName,String folder) {
+    stepHelper.openPageInEditMode(locatorPropertyReader.get(folder) + "/"+ pageName.toLowerCase() + ".html"); }
+
+  @When("I navigate to {string}")
+  public void i_navigate_to_folder_expfrag(String URL) {
+    stepHelper.moveToFolder(URL); }
+  
+  @When("I navigate to {string} using non-dispatcher url")
+  public void i_navigate_to_path_using_non_dispatcher_url(String path) {
+    stepHelper.moveToPathUsingNonDispatcherURL(path); }
+
+  @Given("I am on AEM author login page")
+  public void on_AEM_Author_Instance() {
+    stepHelper.navigateToAuthor(); }
+  
+  @When("I am on AEM author login page using non-dispatcher url")
+  public void i_am_on_AEM_author_login_page_using_non_dispatcher_URL() {
+    stepHelper.navigateToNonDispatcherAuthor();}
+
+  @Then("I enter credentials details")
+  public void i_enter_credentials_details() {
+    stepHelper.authorLogin(); }
+
+  @Then("I view page as Published")
+  public void view_as_published_page() {
+    stepHelper.performPageInfoAction("View as Published"); }
+
+  @Then("I create a new {string} page using template {string}")
+  public void i_create_a_new_page_using_template_oneMarketing_Emplty_Page(String pageName, String templateName) {
+    stepHelper.createPageUsingTemplate(templateName, pageName); }
+
+  @Then("I create {string} homepage using template {string}")
+  public void i_create_homepage_using_template_oneMarketing_Emplty_Page(String pageName,String templateName) {
+    stepHelper.createHomePageUsingTemplate(templateName,pageName); }
+
+  @Then("I go to {string} and open {string} page in edit mode")
+  public void i_open_page_in_edit_mode(String folder,String pageName) {
+    stepHelper.openPageInEditMode(locatorPropertyReader.get(folder) + pageName.toLowerCase() + stepHelper.getOnceComputedTimeStamp() + ".html"); }
+
+  @Then("The {string} displays total {string}")
+  public void validate_text(String element,String text) {
+    assertTrue(text + " not found in" + element ,stepHelper.validateText(element,"data-character-count",text)); }
+
+  @Then("I open {string} properties page for {string} folder")
+  public void i_open_properties_page(String pageName, String folderName) {
+      stepHelper.openPropertiesPageInEditMode(locatorPropertyReader.get("page_properties")+ folderName + "%2Fen_GB%2F"+ pageName.toLowerCase(), pageName); }
+
+  @Then("I open {string} properties page for {string}")
+  public void i_open_properties_page_language_folder(String pageName, String folderName) {
+      stepHelper.openPageInEditMode(locatorPropertyReader.get("page_properties")+ folderName + "%2F"+  pageName); }
+
+  @Then("I add {string} component to the page")
+  public void i_add_component_to_the_page(String componentName) {
+    stepHelper.addComponent(componentName); }
+
+  @Then("I go to {string} folder and open {string} page in edit mode")
+  public void i_open_page_in_edit_mode_without_timestamp(String folder,String pageName) {
+    stepHelper.openPageInEditMode(locatorPropertyReader.get(folder) + "/" + pageName.toLowerCase() + ".html"); }
+
+  @Then("I add {string} component inside {string} component")
+  public void I_add_component_inside_main_component_in_first_drag(String secondComponent, String firstComponent) {
+    stepHelper.addComponentInAnotherComponent(secondComponent, firstComponent); }
+
+  @Then("I configure {string} dropdown with {string} value")
+  public void I_configure_field_with_dropdownvalue(String element, String text) {
+    stepHelper.enterTextUsingJavaScriptExecutor(element, text); }
+
+  @Then("I configure {string} field with dropdown value {string} for properties page")
+  public void I_configure_field_with_dropdownvalue_propertiespage(String element, String text) {
+    stepHelper.labelFieldWithDropdownvaluePropertiesPage(element,text); }
+
+  @Then("I click on done icon")
+  public void closeConfigurationWindow(){
+	  stepHelper.closeConfWindow();
+  }
+
+  @Then("I open configuration window for {string} component")
+  public void openConfigurationWindow(String component){
+    stepHelper.openConfigureWindow(component); }
+
+  @Then("I open configuration window for {string} component inside {string} component")
+  public void openConfigureWindowInsideanother(String childComponent,String parentComponent){
+    stepHelper.openConfigureWindowInsideanother(childComponent,parentComponent); }
+
+  @Then("I open the properties page for {string} component for {string} folder in edit mode")
+  public void i_open_properties_page_in_edit_mode(String pageName,String folderName) {
+      stepHelper.openPropertiesPageInEditMode(locatorPropertyReader.get("folder_properties")+ "%2Fen_GB%2F" + folderName + "%2F"+ pageName.toLowerCase(),pageName); }
+
+  @When("I create folder with name {string}")
+  public void i_create_a_with_name(String string) {
+	  stepHelper.createNewFolder(string); }
+
+  @Then("I create a new {string} experience fragment page using template {string}")
+  public void i_create_experience_fragment_using_template(String pageName, String templateName) {
+    stepHelper.createExpFragmentUsingTemplate(templateName, pageName); }
+
+  @Then("I open {string} page in edit mode")
+  public void open_page_in_edit_mode(String pageName) {
+    stepHelper.openPageInEditMode(locatorPropertyReader.get("english_homepage") + "/"+ pageName.toLowerCase() + stepHelper.getOnceComputedTimeStamp() + ".html"); }
+
+  @Then("I open {string} configure window")
+  public void i_configure_on_exp_fragment(String page) {
+	  stepHelper.openConfigureWindow(page); }
+
+  @Then("I open {string} page in {string} in edit mode")
+  public void i_open_page_expfragment_edit_mode(String pageName, String folderName) {
+    stepHelper.openPageInEditMode(locatorPropertyReader.get("exp_fragment") + folderName + "/"+ pageName.toLowerCase() + stepHelper.getOnceComputedTimeStamp() + "/master.html"); }
+
+  @When("I click on {string} for context aware")
+  public void i_click_on_for_context_aware(String element) {
+    stepHelper.clickifElementVisible(element); }
+
+  @Then("I delete the {string} folder")
+  public void i_delete_page(String folder) {
+	  stepHelper.deleteFolder(folder); }
+
+  @Then("Page is displayed with title {string}")
+  public void title_displayed(String title){
+    assertEquals(title, stepHelper.returnTitle()); }
+
+   @Then("I click on {string} icon")
+   public void click_on_icon(String elementName){
+     stepHelper.handleStaticWait(2000);
+     stepHelper.clickOn(elementName);
+     stepHelper.handleStaticWait(2000); }
+
+   @Then("I open {string} experience fragment properties page for {string}")
+   public void i_open_experience_fragment_properties_page(String pageName, String folderName) {
+ 	  stepHelper.openPageInEditMode(locatorPropertyReader.get("experience_fragment_page_properties")+ folderName + "%2F"+  pageName); }
+
+   @When("I click on {string} checkbox")
+   public void i_click_on_checkbox(String element) {
+      stepHelper.clickOnCheckbox(element); }
+
+   @When("I click on {string} checkbox for properties page")
+   public void i_click_on_properties_checkbox(String element) {
+     stepHelper.clickOnPropertiesCheckbox(element); }
+
+    @Then("I open {string} properties page for folder {string}")
+    public void i_open_properties_page_for_molecules(String pageName, String folderName) {
+     stepHelper.openPageInEditMode(locatorPropertyReader.get("breadcrumb_properties_page")+"%2F"+ folderName + "%2F" + pageName); }
+
+  @Then("I open page {string} in edit mode")
+  public void open_page_in_edit(String pageName) {
+    stepHelper.openPageInEditMode(locatorPropertyReader.get("breadcrumb-page") + "/"+ pageName.toLowerCase() + ".html"); }
+
+}
