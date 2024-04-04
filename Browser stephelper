@@ -1,0 +1,850 @@
+package com.allianz.onemarketing.platform.utils;
+
+import io.percy.selenium.Percy;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.openqa.selenium.*;
+import org.openqa.selenium.devtools.DevTools;
+import org.openqa.selenium.devtools.HasDevTools;
+import org.openqa.selenium.devtools.v116.network.Network;
+import org.openqa.selenium.interactions.Actions;
+import org.openqa.selenium.support.Color;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
+import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.time.Duration;
+import java.util.Date;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Arrays;
+
+
+public class BrowserStepHelper extends StepHelper {
+
+    private static final Logger LOGGER = LogManager.getLogger(BrowserStepHelper.class.getName());
+    private final WebDriver driver;
+    private final WebDriverWait wait;
+    private final SimpleDateFormat dateformat = new SimpleDateFormat("yyyyMMddHHmmss");
+    private final JavascriptExecutor jsExecutor;
+    private final String timestamp;
+    private final String screenShotLocation;
+    private final Percy percy;
+    private final Actions actions;
+
+    public BrowserStepHelper(BrowserManager browserManager, GlobalPropertyProvider globalPropertyReader,
+                             LocationPropertyProvider locatorPropertyReader) {
+        super(globalPropertyReader, locatorPropertyReader);
+        LoggingUtils.setLevel(LOGGER, logLevel);
+        this.driver = browserManager.getDriver();
+        timestamp = dateformat.format(new Date());
+        screenShotLocation = globalPropertyReader.get("jenkinsScreenShotLocation");
+        this.wait = new WebDriverWait(this.driver, Duration.ofSeconds(getWaitTimeForEnvironment(authorBaseUrl)));
+        this.jsExecutor = (JavascriptExecutor) driver;
+        this.percy = new Percy(driver);
+        actions = new Actions(driver);
+    }
+
+    /**
+     * Method to open URL
+     *
+     * @param url : String : URL for navigation
+     */
+    public void navigateTo(String url) {
+        LOGGER.info("navigating to {}", url);
+        driver.get(url);
+    }
+
+    public void navigateToPublishedPage(String pageURL) {
+        navigateTo(publisherBaseUrl + locatorPropertyReader.get(pageURL));
+        LOGGER.info("TITLE IS : {} AND URL IS : {}", driver.getTitle(), driver.getCurrentUrl());
+    }
+
+    public void navigateToPageOnAuthorViewAsPublished(String pageURL) {
+        LOGGER.info("Viewing page on Author 'View as Published'!");
+        navigateTo(authorBaseUrlViewAsPublished + locatorPropertyReader.get(pageURL) +
+                getDisableEditModeParameter(locatorPropertyReader.get(pageURL)));
+        authorLogin();
+        LOGGER.info("TITLE IS : {} AND URL IS : {}", driver.getTitle(), driver.getCurrentUrl());
+    }
+
+    public String getDisableEditModeParameter(String pageURL) {
+        if (pageURL.contains("=") || pageURL.contains("?")) {
+            LOGGER.info("URL already contains parameters. Appending no-edit-mode parameter..");
+            return "&wcmmode=disabled";
+        } else {
+            return "?wcmmode=disabled";
+        }
+    }
+
+    public void captureScreenShot(String pageName) {
+        if (globalPropertyReader.get("captureScreenShot").equalsIgnoreCase("true")) {
+            final String message = "screenshot page : " + screenShotLocation + pageName + ".png";
+            File file = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
+            try {
+                FileUtils.copyFile(file, new File(FilenameUtils.getName(screenShotLocation + pageName + ".png")));
+            } catch (IOException e) {
+                LOGGER.warn("File was not written: {}", message);
+            }
+            LOGGER.info("Screen shot written : {}", message);
+        }
+    }
+
+    public void navigateToAuthor() {
+        navigateTo(authorBaseUrl + globalPropertyReader.get("aemAuthorFallbackURL"));
+    }
+
+    public void navigateToNonDispatcherAuthor() {
+        navigateTo(readFirstUrl(aemNonDispatcherAuthorUrls) + globalPropertyReader.get("aemAuthorFallbackURL"));
+    }
+
+    private String readFirstUrl(String nonDispatcherAuthorUrls) {
+        String[] urls = nonDispatcherAuthorUrls.trim().split(" ");
+        String firstUrl = "";
+        if (urls.length > 1) {
+            firstUrl = urls[0];
+        } else {
+            firstUrl = nonDispatcherAuthorUrls;
+        }
+        return firstUrl.endsWith("/") ? firstUrl : firstUrl + "/";
+    }
+
+    public void navigateToNdbxPage(String path) {
+        String basicAuthPrefix = "https://" + ndbxUsername + ":" + ndbxPassword + "@";
+        String url = ndbxBaseUrl.replace("https://", basicAuthPrefix) + getNdbxTopPath() + "/patterns/" + path;
+        navigateTo(url);
+    }
+
+    private static String getNdbxTopPath() {
+        String branchName = System.getenv("BRANCH_NAME");
+        if (branchName.equals("master") || branchName.equals("origin/master")) {
+            return "prod";
+        } else {
+            return "dev/" + branchName;
+        }
+    }
+
+    public void moveToFolder(String path) {
+        navigateTo(authorBaseUrl + locatorPropertyReader.get(path));
+    }
+
+    public void moveToPathUsingNonDispatcherURL(String path) {
+        navigateTo(readFirstUrl(aemNonDispatcherAuthorUrls) + locatorPropertyReader.get(path));
+    }
+
+    /**
+     * Method to click on element
+     *
+     * @param element : String element to click
+     */
+
+    public void clickOn(String element) {
+        LOGGER.info("Clicking on {}", element);
+        By elementSelector = getElementSelector(element);
+        wait.until(ExpectedConditions.elementToBeClickable(elementSelector)).click();
+        waitForPageLoad();
+    }
+
+    public void clickOn(By elementSelector) {
+        LOGGER.info("Clicking on {}", elementSelector);
+        wait.until(ExpectedConditions.visibilityOfElementLocated(elementSelector)).click();
+    }
+
+    public void clickOnIfExist(String element) {
+        By elementSelector = getElementSelector(element);
+        if (driver.findElements(elementSelector).size() > 0) {
+            wait.until(ExpectedConditions.visibilityOfElementLocated(elementSelector)).click();
+            waitForPageLoad();
+        }
+    }
+
+    public void clickOnUsingQuerySelector(String element) {
+        wait.until(ExpectedConditions.visibilityOfElementLocated(getElementSelector(element)));
+        WebElement elementSelector = driver.findElement(getElementSelector(element));
+        jsExecutor.executeScript("arguments[0].click();", elementSelector);
+    }
+
+    public void enterText(String text, String element) {
+        LOGGER.info("Enter text in element: {}", element);
+        By elementSelector = getElementSelector(element);
+        WebElement field = wait.until(ExpectedConditions.visibilityOfElementLocated(elementSelector));
+        long startTime = System.currentTimeMillis();
+        field.clear();
+        while (!field.getAttribute("value").equals(text) && System.currentTimeMillis() - startTime < 4000) {
+            if (text.length() > 20) {
+                field.clear();
+                int n = text.length() / 5 + 1;
+                int temp = 0;
+                int i = 0;
+                for (; i < n; i = i + 1) {
+                    if ((5 * i) + 5 > text.length()) {
+                        field.sendKeys(text.substring((5 * i), text.length()));
+                    } else {
+                        String part = text.substring((5 * i), (5 * i) + 5);
+                        field.sendKeys(part);
+                        temp++;
+                    }
+                }
+            } else {
+                field.clear();
+                field.sendKeys(text);
+            }
+        }
+    }
+
+    public void clickifElementVisible(String element) {
+        waitForPageLoad();
+        By elementSelector = getElementSelector(element);
+        wait.until(ExpectedConditions.presenceOfElementLocated(elementSelector));
+        if (driver.findElement(elementSelector).isDisplayed()) {
+            clickOn(element);
+        }
+    }
+
+    public String verifyElementDisabled(String element) {
+        By elementSelector = getElementSelector(element);
+        return wait.until(ExpectedConditions.presenceOfElementLocated(elementSelector)).getAttribute("disabled");
+    }
+
+
+    public void validateDisplay(String element) {
+        By elementSelector = getElementSelector(element);
+        wait.until(ExpectedConditions.visibilityOfElementLocated(elementSelector));
+    }
+
+    public void validatePresent(String element) {
+        By elementSelector = getElementSelector(element);
+        wait.until(ExpectedConditions.presenceOfElementLocated(elementSelector));
+    }
+
+    public void clickifElementPresent(String element) {
+        By elementSelector = getElementSelector(element);
+        if (driver.findElements(elementSelector).size() > 0) {
+            clickOn(element);
+        }
+    }
+
+    public void removePlatformSeoConfiguration(String element) {
+        clickOnUsingQuerySelector(element);
+        clickOn("delete icon");
+        clickOn("ok button warning");
+
+    }
+
+    private By getElementSelector(String elementName) {
+        elementName = locatorPropertyReader.get(elementName.trim().toLowerCase().replace(" ", "_"));
+        final By elementSelector;
+        if (elementName.startsWith("//")) {
+            elementSelector = By.xpath(elementName);
+        } else {
+            elementSelector = By.cssSelector(elementName);
+        }
+        return elementSelector;
+    }
+
+    /**
+     * Method to scroll to start or end of page  or scroll to element
+     *
+     * @param to : String : Scroll to start or end of page or scroll to element
+     */
+    public void scrollPage(String to) {
+        JavascriptExecutor executor = (JavascriptExecutor) driver;
+        if (to.equals("end")) {
+            executor.executeScript("window.scrollBy(0,document.body.scrollHeight)");
+        }            
+        else if (to.equals("start")) {
+            executor.executeScript("window.scrollBy(0,-document.body.scrollHeight)");
+        }  
+        else {
+            WebElement elementSelector = driver.findElement(getElementSelector(to));
+            executor.executeScript("arguments[0].scrollIntoView();", elementSelector);
+        }
+    }
+
+    public void moveToElement(String element) {
+        By elementSelector = getElementSelector(element);
+        WebElement field = wait.until(ExpectedConditions.visibilityOfElementLocated(elementSelector));
+        actions.moveToElement(field).perform();
+    }
+
+    public void hoverOverElement(String element) {
+        actions.moveToElement(wait.until(ExpectedConditions.visibilityOfElementLocated(getElementSelector(element))), 10, 10);
+        actions.build().perform();
+    }
+
+    /**
+     * Method to switch to new window
+     */
+    public void switchToNewWindow() {
+        String parentWinHandle = driver.getWindowHandle();
+        Set<String> winHandles = driver.getWindowHandles();
+        for (String handle : winHandles) {
+            if (!handle.equals(parentWinHandle)) {
+                driver.switchTo().window(handle);
+            }
+        }
+    }
+
+    public void createPageUsingTemplate(String templateName, String pageName) {
+        createTemplate(templateName);
+        enterText(pageName + getOnceComputedTimeStamp(), "pageTitle");
+        enterPageDescription("Pagedescription", pageName + "Description");
+        submitPage();
+    }
+
+    public void createHomePageUsingTemplate(String templateName, String pageName) {
+        createTemplate(templateName);
+        enterText(pageName, "pageTitle");
+        enterPageDescription("Pagedescription", pageName + "description");
+        submitPage();
+    }
+
+    public void createTemplate(String templateName) {
+        clickCreatePage();
+        clickOn("PageList");
+        clickOn(templateName);
+        clickOn("nextButtonTemplate");
+    }
+
+    public void enterPageDescription(String element, String pageName) {
+        By elementSelector = getElementSelector(element);
+        if (driver.findElements(elementSelector).size() != 0) {
+            enterText(pageName + "Description", "pagedescription");
+        }
+    }
+
+    public void submitPage() {
+        clickOn("createFinalPage");
+        clickOn("doneButton");
+    }
+
+
+    public void handleEnvRefreshPopup() {
+        if (driver.findElements(getElementSelector("alert_popup")).size() > 0) {
+            clickOn("dont_show_again");
+            clickOn("close-popup");
+        }
+    }
+
+    public void handlePagePopup() {
+        if (driver.findElements(getElementSelector("page_popup")).size() > 0) {
+            clickOn("close-popup");
+        }
+    }
+
+    public String getOnceComputedTimeStamp() {
+        return this.timestamp;
+    }
+
+    public String getElementText(String element) {
+        By elementSelector = getElementSelector(element);
+        return wait.until(ExpectedConditions.visibilityOfElementLocated(elementSelector)).getText();
+
+    }
+
+    public void addComponent(String componentName) {
+        waitForPageLoad();
+        refreshPage();
+        waitForPageLoad();
+        handleStaticWait(2000);
+        handlePagePopup();
+        clickOn("dragComponentHere");
+        clickOn("plusButton");
+        enterText(componentName, "componentInputField");
+        handleStaticWait(2000);
+        String element = "//coral-selectlist//coral-selectlist-item[text()='" + componentName + "']";
+        clickOn(getSelectorValue(element));
+        waitForPageLoad();
+    }
+
+    public void refreshPage() {
+        driver.navigate().refresh();
+    }
+
+    public void navigateToBackPage() {
+        driver.navigate().back();
+    }
+
+    public void addComponentInAnotherComponent(String secondComponent, String firstComponent) {
+        String dragComponentLocator = "(//div[@title='" + firstComponent + "']/div[contains(@title,'Parsys')]/div)[1]";
+        clickOn(getSelectorValue(dragComponentLocator));
+        clickOn("plusButton");
+        enterText(secondComponent, "componentInputField");
+        String secondCompoenentLocator = "//coral-selectlist//coral-selectlist-item[text()='" + secondComponent + "']";
+        handleStaticWait(2000);
+        clickOn(getSelectorValue(secondCompoenentLocator));
+    }
+
+    public void enterTextUsingJavaScriptExecutor(String element, String text) {
+        waitForPageLoad();
+        By elementSelector = getElementSelector(element);
+        WebElement field = wait.until(ExpectedConditions.visibilityOfElementLocated(elementSelector));
+        jsExecutor.executeScript("arguments[0].value=('" + text + "');", field);
+    }
+
+    public void labelFieldWithDropdownvaluePropertiesPage(String element, String text) {
+        handleStaticWait(2000);
+        enterText(text, element);
+        handleStaticWait(2000);
+        clickOn("canonical field");
+    }
+
+    public void closeConfWindow() {
+        clickOn("doneIcon");
+        waitForPageLoad();
+        driver.navigate().refresh();
+        waitForPageLoad();
+        handleStaticWait(2000);
+    }
+
+    /**
+     * method to switch to default content
+     */
+    public void switchToDefaultContent() {
+        driver.switchTo().defaultContent();
+    }
+
+    public void switchToTabletMode() {
+        Dimension dimension = new Dimension(800, 1280);
+        driver.manage().window().setSize(dimension);
+        LOGGER.info("Switching to tablet mode");
+    }
+
+    public void switchToMobileMode() {
+        Dimension dimension = new Dimension(320, 700);
+        driver.manage().window().setSize(dimension);
+        LOGGER.info("Switching to mobile mode");
+    }
+
+    public void switchToIframe(String iframe) {
+        driver.switchTo().frame(iframe);
+    }
+
+    public void changeResolution(int width) {
+        Dimension dimension = new Dimension(width, 900);
+        driver.manage().window().setSize(dimension);
+        LOGGER.info("change Resolution");
+    }
+
+    public String validateAttributeForElementPresent(String attributeName, String element) {
+        By elementSelector = getElementSelector(element);
+        return wait.until(ExpectedConditions.presenceOfElementLocated(elementSelector)).getAttribute(attributeName);
+    }
+
+    public boolean validateAttributeNotPresentForElement(String attributeName, String element) {
+        By elementSelector = getElementSelector(element);
+        return wait.until(ExpectedConditions.presenceOfElementLocated(elementSelector)).getAttribute(attributeName) != null;
+    }
+
+    public int getElementCount(String element) {
+        By elementSelector = getElementSelector(element);
+        wait.until(ExpectedConditions.presenceOfElementLocated(elementSelector));
+        return driver.findElements(elementSelector).size();
+    }
+
+    public boolean validateURLInSameTab(String urlText) {
+        boolean isURLContains = false;
+        if (getWindowCount() == 1) {
+            isURLContains = wait.until(ExpectedConditions.urlContains(urlText));
+        }
+        return isURLContains;
+    }
+
+    public Boolean validateElementPresent(String element) {
+        By elementSelector = getElementSelector(element);
+        return wait.until(ExpectedConditions.presenceOfElementLocated(elementSelector)) != null;
+    }
+
+    public String returnColour(String element, String colourProperty) {
+        By elementSelector = getElementSelector(element);
+        String color = wait.until(ExpectedConditions.visibilityOfElementLocated(elementSelector)).getCssValue(colourProperty);
+        if (color.startsWith("#")) {
+            return color;
+        } else if (color.startsWith("rgba") || color.startsWith("rgb")) {
+            return Color.fromString(color).asHex();
+        }
+        return color;
+    }
+
+    public boolean validateURLInNewTab(String urlText) {
+        if (getWindowCount() == 2) {
+            switchToNewWindow();
+        }
+        String url = driver.getCurrentUrl();
+        return url.contains(urlText);
+    }
+
+    public String validateAttribute(String attributeName, String element) {
+        By elementSelector = getElementSelector(element);
+        if (attributeName.equalsIgnoreCase("color")) {
+            return returnColour(element, "color");
+        }
+        return wait.until(ExpectedConditions.visibilityOfElementLocated(elementSelector)).getAttribute(attributeName);
+    }
+
+    public Boolean validateAttributeContains(String value, String attributeName, String element) {
+        By elementSelector = getElementSelector(element);
+        if (wait.until(ExpectedConditions.visibilityOfElementLocated(elementSelector)).getAttribute(attributeName)
+                .contains(value)) {
+            return true;
+        }
+        return false;
+    }
+
+    public Boolean validateAttributeForElementPresentContainsValue(String attributeName, String element, String value) {
+        By elementSelector = getElementSelector(element);
+        if (wait.until(ExpectedConditions.presenceOfElementLocated(elementSelector)).getAttribute(attributeName).contains(value)) {
+            return true;
+        }
+        return false;
+    }
+
+    public String verifyCssValueDisplayed(String elementName, String attributeName) {
+        By elementSelector = getElementSelector(elementName);
+        return wait.until(ExpectedConditions.visibilityOfElementLocated(elementSelector)).getCssValue(attributeName);
+    }
+
+    public String verifyCssValuePresent(String elementName, String attributeName) {
+        By elementSelector = getElementSelector(elementName);
+        return wait.until(ExpectedConditions.presenceOfElementLocated(elementSelector)).getCssValue(attributeName);
+    }
+
+    public int getWindowCount() {
+        Set<String> winHandles = driver.getWindowHandles();
+        return winHandles.size();
+    }
+
+    public Boolean verifyClassStatus(String element, String status) {
+        return validateAttribute("class", element).endsWith(status);
+    }
+
+    public void authorLogin() {
+        enterText(authorUsername, "aem_username_field");
+        enterText(authorPass, "aem_password_field");
+        clickOn("login_button");
+    }
+
+    public boolean verifyMandatoryClass(String element, String mandatoryClassName) {
+        return validateAttribute("class", element).contains(mandatoryClassName);
+    }
+
+    /**
+     * This function takes locator as input and return by value
+     *
+     * @param elementSelector string representation of an element selector
+     * @return By by
+     */
+    private By getSelectorValue(String elementSelector) {
+        final By elementSelectorValue;
+        if (elementSelector.startsWith("//") || elementSelector.startsWith("(//")) {
+            elementSelectorValue = By.xpath(elementSelector);
+        } else {
+            elementSelectorValue = By.cssSelector(elementSelector);
+        }
+        return elementSelectorValue;
+    }
+
+    public void openPageInEditMode(String pagePath) {
+        waitForPageLoad();
+        navigateTo(authorBaseUrl + pagePath);
+        waitForPageLoad();
+    }
+
+    public Boolean validateText(String element, String attributeName, String text) {
+        return validateAttributeForElementPresent(attributeName, element).contains(text);
+    }
+
+    public void openPropertiesPageInEditMode(String pagePath, String pageName) {
+        waitForPageLoad();
+        navigateTo(authorBaseUrl + pagePath);
+        waitForPageLoad();
+        clearText("page title");
+        clearText("pageDescription");
+        enterText(pageName, "page title");
+        enterText(pageName, "pagedescription");
+    }
+
+    public void performPageInfoAction(String pageInfoAction) {
+        handleStaticWait(2000);
+        clickOnUsingQuerySelector("page information icon");
+        waitForPageLoad();
+        handleStaticWait(2000);
+        clickOn(getSelectorValue("//button[@title='" + pageInfoAction + "']"));
+        waitForPageLoad();
+        // Switch required for view as published function
+        switchToNewWindow();
+    }
+
+    public void waitForPageLoad() {
+        wait.until(this::internalWait);
+    }
+
+    private boolean internalWait(WebDriver webDriver) {
+        final String documentState = ((JavascriptExecutor) webDriver).executeScript("return document.readyState").toString();
+        if (!"complete".equals(documentState)) {
+            LOGGER.info("Waiting, documentState: {}", documentState);
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    public void handleStaticWait(long waitTime) {
+        try {
+            Thread.sleep(waitTime);
+        } catch (Exception e) {
+            LOGGER.warn("Sleeping was interrupted");
+            Thread.currentThread().interrupt();
+        }
+        LOGGER.warn("This is a static wait, will need optimization");
+    }
+
+    public int getWaitTimeForEnvironment(String hostName) {
+        if (hostName.contains(".adobecqms.net"))
+            return Integer.parseInt(globalPropertyReader.get("adobePageLoadWaitTime"));
+        else
+            return waitTime;
+    }
+
+    public Boolean validateElementNotPresent(String element) {
+        By elementSelector = getElementSelector(element);
+        return wait.until(ExpectedConditions.invisibilityOfElementLocated(elementSelector)) != null;
+    }
+
+    public void deleteCookies() {
+        driver.manage().deleteAllCookies();
+    }
+
+    public Boolean validateAttributeValue(String attribute, String element, String attributeValue, String value1,
+                                          String value2, String value3) {
+        By elementSelector = getElementSelector(element);
+        String attributeName = wait.until(ExpectedConditions.visibilityOfElementLocated(elementSelector)).getAttribute(attribute);
+        if (attributeValue.equalsIgnoreCase(value1) && !attributeValue.contains(value2) && !attributeValue.contains(value3)) {
+            return true;
+        }
+        return attributeName.contains(attributeValue);
+    }
+
+    public void createNewFolder(String title) {
+        waitForPageLoad();
+        By elementSelector = getElementSelector(title);
+        if (driver.findElements(elementSelector).size() == 0) {
+            clickCreatePage();
+            clickOn("Folder");
+            enterText(title, "folder_title");
+            clickOn("button submit");
+            waitForPageLoad();
+            handleStaticWait(2000);
+        }
+    }
+
+    public void folderTitle(String title, String element) {
+        enterText(title, element);
+    }
+
+    public void createExpFragmentUsingTemplate(String templateName, String pageName) {
+        clickCreatePage();
+        clickOn("experience fragment");
+        clickOn(templateName);
+        clickOn("nextButtonTemplate");
+        clearText("experience fragment title");
+        enterText(pageName + getOnceComputedTimeStamp(), "experience fragment title");
+        enterPageDescription("pageDescription", pageName + "PageDescription");
+        clickOn("createFinalPage");
+        clickOn("doneButton");
+    }
+
+    public void openConfigureWindow(String component) {
+        clickOn(getSelectorValue("//div[@title='" + component + "']"));
+        clickOn("configureIcon");
+        handleStaticWait(5000);
+    }
+
+    public void openConfigureWindowInsideanother(String childComponent, String parentComponent) {
+        clickOn(getSelectorValue("//div[@title='" + parentComponent + "']//div[@title='" + childComponent + "']"));
+        clickOn("configureIcon");
+        handleStaticWait(5000);
+    }
+
+    public void clearText(String element) {
+        By elementSelector = getElementSelector(element);
+        wait.until(ExpectedConditions.visibilityOfElementLocated(elementSelector)).clear();
+    }
+
+    public void deleteFolder(String folder) {
+        clickOn("select all");
+        clickOn("delete");
+        clickOn("warning delete");
+        waitForPageLoad();
+        clickOn("force delete");
+        validateElementNotPresent(folder);
+    }
+
+    public void clickCreatePage() {
+        waitForPageLoad();
+        handleEnvRefreshPopup();
+        waitForPageLoad();
+        clickOnUsingQuerySelector("CreatePage");
+    }
+
+    public String returnTitle() {
+        return driver.getTitle();
+    }
+
+    public static void retryWhenTimeout(int retries, Runnable o) {
+        for (int i = 0; i < retries; i++) {
+            try {
+                o.run();
+                break;
+            } catch (TimeoutException te) {
+                if (i > 2) {
+
+                    LOGGER.error("All {} retries failed ", retries);
+                    throw te;
+                } else {
+                    LOGGER.info("Executing {}. retry ", i + 1);
+                }
+            }
+        }
+    }
+
+    public void clickOnCheckbox(String element) {
+        By elementSelector = getElementSelector(element);
+        clickOnUsingQuerySelector(element);
+        if (!(driver.findElement(elementSelector).isSelected())) {
+            clickOnUsingQuerySelector(element);
+        }
+    }
+
+    public void clickOnPropertiesCheckbox(String element) {
+        By elementSelector = getElementSelector(element);
+        if (driver.findElement(elementSelector).getAttribute("checked") != null) {
+            clickOn("save & close");
+        } else {
+            clickOnUsingQuerySelector(element);
+            clickOn("add button in seo configuration");
+            enterText("/content/onemarketing/platform/oe1-ref-portal/en_GB/products", "input field of hrefurl");
+            clickOn("select language input box");
+            handleStaticWait(2000);
+            clickOn("English language with country code");
+            clickOn("select country code input box");
+            handleStaticWait(2000);
+            clickOn("united state country");
+            clickOn("save & close");
+        }
+
+    }
+
+    public void percyScreenshot(String name) {
+        percy.snapshot(name);
+    }
+
+    public void percyScreenshot(String name, List<Integer> widths) {
+        percy.snapshot(name, widths);
+    }
+
+    public void percyScreenshot(String name, List<Integer> widths, Integer minHeight, boolean enableJavaScript) {
+        if (name.contains("curtain")){
+        String htmldom = "(documentElement) => {var breadcrumb = documentElement.querySelectorAll('.c-breadcrumb__container')[0];"+
+        "var ref_node = documentElement.querySelectorAll('footer>.c-footer__container')[0];"+
+        "var breadcrumb_copy = breadcrumb.cloneNode(true);"+ 
+        "ref_node.parentNode.insertBefore(breadcrumb_copy, ref_node.nextSibling);}";
+        Map<String, Object> options = new HashMap<String, Object>();
+        options.put("widths",widths);
+        options.put("minHeight", minHeight);
+        options.put("enableJavaScript", enableJavaScript);
+        options.put("domTransformation", htmldom);
+        options.put("percyCSS", ".c-footer__container--curtain-panel {position: unset !important;padding-top: 0px !important;}"+ 
+        "footer .c-breadcrumb__container {display: none !important;} @media(max-width: 704px)"+
+        "{footer .c-breadcrumb__container {display: block !important;}"+
+        "body>.c-breadcrumb__container { display: none !important; }}");
+        percy.snapshot(name, options);
+        }
+        else{
+        percy.snapshot(name, widths, minHeight, enableJavaScript);
+        }
+    }
+
+    public void keyPress(String key, String element) {
+        By elementSelector = getElementSelector(element);
+        WebElement field = wait.until(ExpectedConditions.visibilityOfElementLocated(elementSelector));
+        switch (key) {
+            case "tab":
+                field.sendKeys(Keys.TAB);
+                break;
+            case "enter":
+                field.sendKeys(Keys.ENTER);
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown Key name");
+
+        }
+
+    }
+
+    public void keyPressEvent(String key) {
+        switch (key.toUpperCase()) {
+            case "TAB":
+                new Actions(driver)
+                        .sendKeys(Keys.TAB)
+                        .perform();
+                break;
+            case "ENTER":
+                new Actions(driver)
+                        .sendKeys(Keys.ENTER)
+                        .perform();
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown Key name");
+        }
+    }
+
+    public void isButtonEnabled(String element) {
+        By elementSelector = getElementSelector(element);
+        wait.until(ExpectedConditions.presenceOfElementLocated(elementSelector)).isEnabled();
+        clickOn(element);
+    }
+
+    public void updateThemeHrefAttributeInDOMt(String value) {
+        String themeHrefUrl = "/etc.clientlibs/onemarketing/platform/clientlibs/main_ukpl.min.css";
+        String[] urls = themeHrefUrl.split("_");
+        String newUrl = String.join("_", urls[0], value) + ".min.css";
+        jsExecutor.executeScript("document.querySelector('head link[rel=\"stylesheet\"][type=\"text/css\"]')" +
+                ".setAttribute('href', '" + newUrl + "')");
+    }
+
+    public int getResponseCode(String fileName, String elementSelector) {
+        String currentUrl = driver.getCurrentUrl();
+        Integer[] responseId = new Integer[1];
+        createDevToolSession(fileName, responseId);
+        navigateTo(currentUrl);
+        clickOn(elementSelector);
+        if(responseId[0] != null)
+            return(responseId[0]);
+        else
+            return 404;
+     }
+
+    public void createDevToolSession(String fileName, Integer[] responseId) {
+        DevTools devTools = ((HasDevTools) driver).getDevTools();
+        devTools.createSession();
+        devTools.send(Network.enable(Optional.empty(), Optional.empty(), Optional.empty()));
+        devTools.addListener(Network.responseReceived(), response -> {
+              String responseUrl = response.getResponse().getUrl();
+              if(responseUrl.contains(fileName)) {
+                  responseId[0] = response.getResponse().getStatus();
+              }
+        });
+    }
+
+    public void moveOutFocus(String elementSelector) {
+        WebElement element = driver.findElement(getElementSelector(elementSelector));
+        jsExecutor.executeScript("const event = new Event('focusout');arguments[0].dispatchEvent(event);", element);
+    }
+}
