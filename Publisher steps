@@ -1,0 +1,217 @@
+package com.allianz.onemarketing.platform.publisher.stepdefinitions;
+
+import static com.allianz.onemarketing.platform.utils.BrowserStepHelper.retryWhenTimeout;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import com.allianz.onemarketing.platform.common.picocntainer.TestingGlobalPropertyProvider;
+import com.allianz.onemarketing.platform.common.picocntainer.TestingLocatorPropertyProvider;
+import com.allianz.onemarketing.platform.utils.BrowserManager;
+import com.allianz.onemarketing.platform.utils.BrowserStepHelper;
+import com.allianz.onemarketing.platform.utils.AccessibilityBase;
+
+import io.cucumber.java.en.Given;
+import io.cucumber.java.en.Then;
+import io.cucumber.java.en.When;
+
+import java.util.Arrays;
+import java.util.List;
+
+public class PublisherSteps {
+
+  private final BrowserStepHelper stepHelper;
+  private final boolean useAuthorAsPublisher;
+  private final AccessibilityBase accessibility;
+
+  private static final int DESKTOP_WIDTH = 1280;
+  private static final int MOBILE_WIDTH = 320;
+
+  List<Integer> widths = null;
+
+  public PublisherSteps(BrowserManager browserManager, TestingGlobalPropertyProvider globalPropertyProvider,
+                        TestingLocatorPropertyProvider testingLocatorPropertyProvider) {
+    this.stepHelper = new BrowserStepHelper(browserManager, globalPropertyProvider, testingLocatorPropertyProvider);
+    this.useAuthorAsPublisher = Boolean.parseBoolean(globalPropertyProvider.get("useAuthorAsPublisher"));
+    this.accessibility= new AccessibilityBase(browserManager, Arrays.asList(globalPropertyProvider.get("axeCoreTagNames").split(",")));
+  }
+
+  @Given("I am on {string} page of test portal")
+  public void i_am_on_page(String pageURL) {
+    retryWhenTimeout(3, () -> navigateAndWait(pageURL));
+    stepHelper.captureScreenShot(pageURL);
+  }
+
+  private void navigateAndWait(String pageURL) {
+    if(useAuthorAsPublisher){
+      stepHelper.navigateToPageOnAuthorViewAsPublished(pageURL);
+    }
+    else {
+      stepHelper.navigateToPublishedPage(pageURL);
+    }
+    stepHelper.waitForPageLoad();
+  }
+
+  @When("I change resolution to {int}")
+  public void i_change_resolution_to(int width) {
+    stepHelper.changeResolution(width);
+  }
+
+  @Then("{string} displays {int} rows")
+  public void count_rows(String element, int count) {
+    assertEquals(count, stepHelper.getElementCount(element));
+  }
+
+  @Then("{string} displays {int} columns")
+  public void count_columns(String element, int count) {
+    assertEquals(count, stepHelper.getElementCount(element));
+
+  }
+
+  @Then("{string} displays {int} tiles")
+  public void count_tiles(String element, int count) {
+    assertEquals(count, stepHelper.getElementCount(element));
+  }
+
+
+  @Then("The {string} attribute for {string} is present with value {string}")
+  public void attribute_present_with_value(String attribute_name, String element, String attribute_value) {
+    assertEquals(attribute_value, stepHelper.validateAttribute(attribute_name, element));
+  }
+
+  @Then("{string} displayed with {string} as {string}")
+  public void displayed_with(String elementName, String attribute_name, String attribute_value) {
+    assertEquals(attribute_value, stepHelper.verifyCssValueDisplayed(elementName, attribute_name));
+  }
+
+  @Then("{string} present with {string} as {string}")
+  public void present_with(String elementName, String attribute_name, String attribute_value) {
+    assertEquals(attribute_value, stepHelper.verifyCssValuePresent(elementName, attribute_name));
+  }
+
+  @Then("The {string} attribute for {string} is not present")
+  public void attribut_not_present(String attribute_name, String element) {
+    assertEquals(null, stepHelper.validateAttribute(attribute_name, element));
+  }
+
+  @Then("{string} displays color as {string}")
+  public void verify_text_colour(String element, String colourCode) {
+    assertEquals("#" + colourCode.toLowerCase(), stepHelper.returnColour(element, "color").toLowerCase());
+  }
+
+  @Then("{string} is appended at the end of same page URL")
+  public void is_appended_at_the_end_of_same_page_URL(String urlText) {
+    assertTrue("Error while validating URL in same tab.", stepHelper.validateURLInSameTab(urlText));
+  }
+
+  @Then("I navigate to {string} page in new tab")
+  public void navigate_new_tab(String urlText) {
+    assertTrue(urlText + " not found in the URL.", stepHelper.validateURLInNewTab(urlText));
+  }
+
+  @Then("{int} {string} are displayed")
+  public void verify_element_occurance(int number, String element) {
+    assertEquals(number, stepHelper.getElementCount(element));
+  }
+
+  @Then("{string} displays {int} icons")
+  public void count_icons(String element, int count) {
+    assertEquals(count, stepHelper.getElementCount(element));
+  }
+
+  @Then("{string} is disabled")
+  public void verify_non_class(String element) {
+    stepHelper.verifyClassStatus(element, "none");
+  }
+
+  @Then("I delete cookies")
+  public void i_delete_cookies() {
+    stepHelper.deleteCookies();
+  }
+
+  @Then("I refresh the page")
+  public void i_refresh_page() {
+    stepHelper.refreshPage();
+  }
+
+  @Then("I navigate to back page")
+  public void i_navigate_to_back_page() {
+    stepHelper.navigateToBackPage();
+    stepHelper.waitForPageLoad();
+  }
+
+  @Then("{string} should be present inside attribute {string}")
+  public void shoud_be_present_inside_attribute(String element, String value) {
+    assertTrue(value + " not found in" + element, stepHelper.validateAttributeValue("class", element, value, "default", "small", "large"));
+  }
+
+  @Then("{string} is displayed with attribute value as {string}")
+  public void validate_attribute_value(String element, String attributeValue) {
+    assertTrue(attributeValue, stepHelper.validateAttributeValue("class", element, attributeValue, "none", "check", "close"));
+  }
+
+  @Then("{string} should be present inside {string}")
+  public void shoud_be_present_inside(String value, String element) {
+    assertTrue(value + " not found in" + element, stepHelper.validateAttributeContains(value, "src", element));
+  }
+
+  @Then("{string} is displayed in variant {string}")
+  public void is_displayed_in_variant(String element, String value) {
+    assertTrue(value + " not found in" + element, stepHelper.validateAttributeValue("class", element, value, "xSmall", "small", "medium"));
+  }
+
+  @Then("I move to {string}")
+  public void move_to_element(String element) {
+    stepHelper.moveToElement(element);
+  }
+
+  @Then("I perform visual test for {string}")
+  public void percy_visual_snapshot(String name) {
+    widths = Arrays.asList(DESKTOP_WIDTH);
+    stepHelper.percyScreenshot(name, widths);
+    widths = Arrays.asList(MOBILE_WIDTH);
+    stepHelper.switchToMobileMode();
+    stepHelper.percyScreenshot(name, widths);
+  }
+
+  @Then("I perform visual test for {string} by enabling Javascript")
+  public void percy_visual_snapshot_component(String name) {
+    widths = Arrays.asList(DESKTOP_WIDTH);
+    stepHelper.percyScreenshot(name, widths, null, true);
+    widths = Arrays.asList(MOBILE_WIDTH);
+    stepHelper.switchToMobileMode();
+    stepHelper.percyScreenshot(name, widths, null, true);
+  }
+
+  @Then("{string} is disable")
+  public void check_element_if_disabled(String element) {
+        stepHelper.verifyElementDisabled(element);
+  }
+
+  @Then("I press {string} key for {string}")
+   public void key_press(String key, String element) {
+    stepHelper.keyPress(key,element);
+  }
+
+  @When("I press {string} key")
+  public void i_press_key(String key) {
+    stepHelper.keyPressEvent(key);
+  }
+
+  @Then("I perform accessibility test for {string}")
+  public void accessibility(String componenetName){
+    assertTrue("Accessiblity check failed", accessibility.checkAccessibilityViolations(componenetName)); }
+
+  @Then("I update page for {string} theme")
+  public void set_attribute_in_the_DOM(String value) {
+    stepHelper.updateThemeHrefAttributeInDOMt(value);}
+
+  @Then("{string} file response code is 200 when I click on {string}")
+  public void verify_response_code(String fileName, String element) {
+      assertEquals(200, stepHelper.getResponseCode(fileName, element));}
+
+  @Then("{string} has attribute {string} with value {string}")
+  public void customAccessibilityCheckUsingAttributeValue(String element, String attributeName, String attributeValue){
+    assertEquals("FAILED for attribute '" + attributeName + "' : ", attributeValue, stepHelper.validateAttributeForElementPresent(attributeName, element));
+  }
+}
+
